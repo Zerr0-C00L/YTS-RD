@@ -9,6 +9,10 @@ dist/
 build/
 *.log
 
+# Bulk fetch tracking files
+bulk_fetch_progress.txt
+bulk_fetch_complete.flag
+
 # Virtual environments
 venv/
 env/

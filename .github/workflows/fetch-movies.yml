@@ -1,17 +1,17 @@
-name: Fetch YTS Movies to Real-Debrid
+name: Fetch Latest YTS Movies to Real-Debrid
 
 on:
   schedule:
-    # Run every hour at minute 0
+    # Run every hour at minute 0 (only fetches latest after bulk is complete)
     - cron: '0 * * * *'
   
   # Allow manual trigger
   workflow_dispatch:
     inputs:
       max_movies:
-        description: 'Maximum number of movies to fetch'
+        description: 'Maximum number of latest movies to fetch'
         required: false
-        default: '10'
+        default: '20'
 
 jobs:
   fetch-movies:
@@ -35,7 +35,7 @@ jobs:
       - name: Fetch and add movies to Real-Debrid
         env:
           REAL_DEBRID_API_TOKEN: ${{ secrets.REAL_DEBRID_API_TOKEN }}
-          MAX_MOVIES: ${{ github.event.inputs.max_movies || '10' }}
+          MAX_MOVIES: ${{ github.event.inputs.max_movies || '20' }}
           FETCH_ALL_QUALITIES: 'true'
           MIN_RATING: '0'
         run: |

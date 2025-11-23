@@ -8,6 +8,7 @@ import os
 import sys
 import requests
 import json
+import time
 from datetime import datetime
 from typing import List, Dict, Optional
 
@@ -62,12 +63,13 @@ class RealDebridClient:
             "Authorization": f"Bearer {api_token}"
         }
     
-    def add_magnet(self, magnet_link: str) -> Optional[str]:
+    def add_magnet(self, magnet_link: str, retry_count: int = 3) -> Optional[str]:
         """
-        Add a magnet link to Real-Debrid
+        Add a magnet link to Real-Debrid with retry logic
         
         Args:
             magnet_link: The magnet URI
+            retry_count: Number of retries for rate limiting
         
         Returns:
             Torrent ID if successful, None otherwise
@@ -75,22 +77,35 @@ class RealDebridClient:
         endpoint = f"{self.base_url}/torrents/addMagnet"
         data = {"magnet": magnet_link}
         
-        try:
-            response = requests.post(endpoint, headers=self.headers, 
-                                    data=data, timeout=30)
-            response.raise_for_status()
-            result = response.json()
-            return result.get("id")
-        except requests.exceptions.RequestException as e:
-            print(f"Error adding magnet to Real-Debrid: {e}")
-            return None
+        for attempt in range(retry_count):
+            try:
+                response = requests.post(endpoint, headers=self.headers, 
+                                        data=data, timeout=30)
+                response.raise_for_status()
+                result = response.json()
+                return result.get("id")
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 429:  # Rate limited
+                    if attempt < retry_count - 1:
+                        wait_time = (attempt + 1) * 5  # Progressive backoff: 5s, 10s, 15s
+                        print(f"      Rate limited, waiting {wait_time}s before retry...")
+                        time.sleep(wait_time)
+                        continue
+                print(f"Error adding magnet to Real-Debrid: {e}")
+                return None
+            except requests.exceptions.RequestException as e:
+                print(f"Error adding magnet to Real-Debrid: {e}")
+                return None
+        
+        return None
     
-    def select_files(self, torrent_id: str) -> bool:
+    def select_files(self, torrent_id: str, retry_count: int = 3) -> bool:
         """
-        Select all files in a torrent for download
+        Select all files in a torrent for download with retry logic
         
         Args:
             torrent_id: The torrent ID from Real-Debrid
+            retry_count: Number of retries
         
         Returns:
             True if successful, False otherwise
@@ -98,21 +113,36 @@ class RealDebridClient:
         endpoint = f"{self.base_url}/torrents/selectFiles/{torrent_id}"
         data = {"files": "all"}
         
-        try:
-            response = requests.post(endpoint, headers=self.headers, 
-                                    data=data, timeout=30)
-            response.raise_for_status()
-            return True
-        except requests.exceptions.RequestException as e:
-            print(f"Error selecting files: {e}")
-            return False
+        for attempt in range(retry_count):
+            try:
+                response = requests.post(endpoint, headers=self.headers, 
+                                        data=data, timeout=30)
+                response.raise_for_status()
+                return True
+            except requests.exceptions.HTTPError as e:
+                if e.response.status_code == 404 and attempt < retry_count - 1:
+                    # Torrent might not be ready yet, wait and retry
+                    time.sleep(2)
+                    continue
+                print(f"Error selecting files: {e}")
+                return False
+            except requests.exceptions.RequestException as e:
+                if attempt < retry_count - 1:
+                    time.sleep(2)
+                    continue
+                print(f"Error selecting files: {e}")
+                return False
+        
+        return False
     
-    def get_torrents(self) -> List[Dict]:
-        """Get list of active torrents"""
+    def get_torrents(self, limit: int = 300000) -> List[Dict]:
+        """Get list of all torrents (active and completed)"""
         endpoint = f"{self.base_url}/torrents"
+        params = {"limit": limit}
         
         try:
-            response = requests.get(endpoint, headers=self.headers, timeout=30)
+            response = requests.get(endpoint, headers=self.headers, 
+                                   params=params, timeout=30)
             response.raise_for_status()
             return response.json()
         except requests.exceptions.RequestException as e:
@@ -164,7 +194,12 @@ def main():
         print("ERROR: REAL_DEBRID_API_TOKEN environment variable not set")
         sys.exit(1)
     
+    # Check if bulk fetch is complete
+    bulk_fetch_complete = os.path.exists("bulk_fetch_complete.flag")
+    mode = "incremental" if bulk_fetch_complete else "initial"
+    
     print(f"Starting YTS to Real-Debrid sync at {datetime.now().isoformat()}")
+    print(f"Mode: {mode.upper()}")
     print(f"Configuration: Max Movies={max_movies}, Min Rating={min_rating}, Fetch All Qualities={fetch_all_qualities}")
     
     # Initialize clients
@@ -243,6 +278,9 @@ def main():
             torrent_id = rd.add_magnet(magnet)
             
             if torrent_id:
+                # Small delay to let Real-Debrid process the torrent
+                time.sleep(1)
+                
                 # Select all files for download
                 if rd.select_files(torrent_id):
                     print(f"    ✓ Successfully added {torrent.get('quality')} (ID: {torrent_id})")
@@ -252,6 +290,9 @@ def main():
                     print(f"    ✗ Added but failed to select files")
             else:
                 print(f"    ✗ Failed to add to Real-Debrid")
+            
+            # Rate limiting: wait between requests to avoid hitting API limits
+            time.sleep(2)
         
         if movie_added:
             added_count += 1

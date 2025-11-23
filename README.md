@@ -1,15 +1,15 @@
 # YTS to Real-Debrid Auto-Fetcher
 
-Automatically fetch the latest movies from YTS and add them to your Real-Debrid account every hour using GitHub Actions.
+Automatically fetch movies from YTS and add them to your Real-Debrid account using GitHub Actions.
 
 ## Features
 
-- 🎬 Fetches latest movies from YTS API hourly
-- 🚀 Automatically adds torrents to Real-Debrid
-- ⚙️ Configurable quality, rating, and movie count
-- 🔄 Avoids duplicates by checking existing torrents
-- 📊 Detailed logging and summaries
-- 🎯 Manual trigger support with custom parameters
+- 🎬 **Bulk Fetch Mode**: One-time import of all 71,000+ movies from YTS
+- ⏰ **Incremental Mode**: Hourly updates to fetch only the latest releases
+- 🎯 **All Qualities**: Automatically adds 2160p, 1080p, and 720p versions
+- 🔄 **Smart Duplicates**: Checks existing torrents to avoid re-adding
+- 📊 **Progress Tracking**: Resume bulk fetch from any page
+- 🚀 **Rate Limiting**: Built-in delays to respect API limits
 
 ## Setup Instructions
 
@@ -32,7 +32,39 @@ Automatically fetch the latest movies from YTS and add them to your Real-Debrid 
 
 1. Go to the **Actions** tab in your repository
 2. Click **"I understand my workflows, go ahead and enable them"** if prompted
-3. The workflow will now run automatically every hour
+
+## Usage
+
+### Option 1: Bulk Fetch All Movies (Recommended First Step)
+
+To import all ~71,000 movies from YTS:
+
+1. Go to **Actions** → **Bulk Fetch All YTS Movies**
+2. Click **Run workflow**
+3. Leave defaults (Start Page: 1, Max Pages: 0 for all)
+4. Click **Run workflow**
+
+**Important Notes:**
+- This will take several hours to complete (~6-10 hours)
+- Processes all qualities (2160p, 1080p, 720p) for each movie
+- Can be paused and resumed by setting the start page
+- Creates a flag file when complete to switch to incremental mode
+- Respects rate limits with automatic delays
+
+**To Resume if Interrupted:**
+1. Check the artifacts from the last run for `bulk_fetch_progress.txt`
+2. Note the last completed page
+3. Run workflow again with Start Page = (last page + 1)
+
+### Option 2: Incremental Mode (Automatic After Bulk)
+
+Once bulk fetch is complete, the hourly workflow automatically switches to incremental mode:
+- Runs every hour automatically
+- Fetches only the latest 20 movies
+- Skips movies already in Real-Debrid
+- Perfect for keeping your collection up-to-date
+
+You can also run it manually anytime from **Actions** → **Fetch Latest YTS Movies**
 
 ## Configuration
 
@@ -40,35 +72,28 @@ You can customize the behavior by modifying the workflow or using manual trigger
 
 ### Default Settings
 
-- **Max Movies:** 10 movies per run
-- **Quality:** 1080p
-- **Minimum Rating:** 6.5 (IMDB)
+**Bulk Fetch Mode:**
+- Processes all pages (can limit with Max Pages parameter)
+- All qualities: 2160p, 1080p, 720p
+- No minimum rating (fetches everything)
+
+**Incremental Mode:**
+- **Max Movies:** 20 latest movies per run
+- **All Qualities:** 2160p, 1080p, 720p
+- **Minimum Rating:** 0 (no filter)
 - **Schedule:** Every hour (at minute 0)
 
-### Manual Trigger
+### Manual Triggers
 
-You can manually trigger the workflow with custom parameters:
+**Bulk Fetch:**
+- **Start Page:** Resume from specific page (default: 1)
+- **Max Pages:** Limit pages to process, 0 = all (default: 0)
+- **Min Rating:** Filter by rating (default: 0 = all movies)
 
-1. Go to **Actions** → **Fetch YTS Movies to Real-Debrid**
-2. Click **Run workflow**
-3. Adjust parameters:
-   - Maximum number of movies (default: 10)
-   - Quality: 720p, 1080p, or 2160p (default: 1080p)
-   - Minimum IMDB rating (default: 6.5)
-4. Click **Run workflow**
+**Incremental Fetch:**
+- **Max Movies:** Number of latest movies to fetch (default: 20)
 
-### Modify Default Settings
-
-Edit `.github/workflows/fetch-movies.yml` and change the environment variables:
-
-```yaml
-env:
-  MAX_MOVIES: '20'        # Increase to fetch more movies
-  QUALITY: '2160p'        # Change to 4K
-  MIN_RATING: '7.0'       # Only fetch highly-rated movies
-```
-
-### Change Schedule
+### Change Hourly Schedule
 
 To run more or less frequently, modify the cron schedule in `.github/workflows/fetch-movies.yml`:
 
@@ -76,36 +101,42 @@ To run more or less frequently, modify the cron schedule in `.github/workflows/f
 schedule:
   - cron: '0 */6 * * *'  # Every 6 hours
   - cron: '0 0 * * *'    # Once daily at midnight
-  - cron: '*/30 * * * *' # Every 30 minutes
+  - cron: '0 */2 * * *'  # Every 2 hours
 ```
 
 ## How It Works
 
-1. **Fetch:** The script queries the YTS API for the latest movies based on your criteria
-2. **Filter:** Movies are filtered by quality, rating, and release date
-3. **Check:** Existing Real-Debrid torrents are checked to avoid duplicates
-4. **Add:** New movie torrents are added to Real-Debrid as magnet links
-5. **Select:** All files in the torrent are automatically selected for download
-6. **Report:** A summary is logged showing what was added
+### Bulk Fetch Mode
+1. **Paginate:** Iterates through all pages of YTS movies (50 per page)
+2. **Extract:** For each movie, gets all quality versions (2160p, 1080p, 720p)
+3. **Check:** Compares against up to 100,000 existing torrents in Real-Debrid
+4. **Add:** Creates magnet links and adds new torrents to Real-Debrid
+5. **Track:** Saves progress every 10 pages for resume capability
+6. **Complete:** Creates flag file when done to enable incremental mode
+
+### Incremental Mode
+1. **Fetch:** Queries YTS API for latest 20 movies sorted by date added
+2. **Check:** Existing Real-Debrid torrents are checked to avoid duplicates
+3. **Add:** New movie torrents (all qualities) are added as magnet links
+4. **Select:** All files in the torrent are automatically selected for download
+5. **Report:** Summary logged showing what was added
 
 ## Local Testing
 
-You can test the script locally before deploying:
-
+### Test Incremental Fetch
 ```bash
-# Install dependencies
 pip install -r requirements.txt
-
-# Set your API token
 export REAL_DEBRID_API_TOKEN="your_token_here"
-
-# Optional: Configure settings
 export MAX_MOVIES=5
-export QUALITY=1080p
-export MIN_RATING=7.0
-
-# Run the script
 python fetch_movies.py
+```
+
+### Test Bulk Fetch (Limited Pages)
+```bash
+export REAL_DEBRID_API_TOKEN="your_token_here"
+export START_PAGE=1
+export MAX_PAGES=2  # Only process 2 pages for testing
+python bulk_fetch.py
 ```
 
 ## Monitoring
@@ -116,24 +147,33 @@ python fetch_movies.py
 
 ## Troubleshooting
 
+### Bulk fetch is slow or timing out?
+
+- GitHub Actions has a 6-hour timeout for workflows
+- Process in batches using MAX_PAGES (e.g., 100 pages at a time)
+- Resume from last completed page using START_PAGE parameter
+- Rate limiting adds ~2-3 seconds per torrent to respect API limits
+
 ### No movies being added?
 
-- Check that your Real-Debrid account is active
-- Verify your API token is correct
-- Lower the `MIN_RATING` to include more movies
-- Increase `MAX_MOVIES` to fetch more results
+- Check that your Real-Debrid account is active and has space
+- Verify your API token is correct in GitHub Secrets
+- Movies may already exist in your Real-Debrid account
+- Check the workflow logs for specific error messages
+
+### Getting rate limited (429 errors)?
+
+- The script has built-in retry logic with progressive backoff
+- Reduce MAX_MOVIES to process fewer movies per run
+- Wait a few minutes and try again
+- Consider processing bulk fetch in smaller batches
 
 ### Workflow not running?
 
 - Ensure GitHub Actions are enabled in your repository
 - Check the **Actions** tab for error messages
 - Free GitHub accounts have usage limits on Actions
-
-### API rate limits?
-
-- YTS and Real-Debrid have rate limits
-- Don't run the workflow too frequently (hourly is reasonable)
-- The script includes error handling for API failures
+- Incremental mode only runs after bulk fetch is complete
 
 ## Privacy & Security
 
@@ -145,6 +185,13 @@ python fetch_movies.py
 ## License
 
 MIT License - Feel free to modify and use as needed.
+
+## Performance Notes
+
+- **Bulk Fetch:** Processing all ~71,000 movies takes 6-10 hours
+- **Each Movie:** ~6-8 seconds to process (3 qualities × 2 seconds delay)
+- **Hourly Incremental:** Completes in 2-5 minutes for 20 movies
+- **Duplicates:** Checking 100,000 existing torrents is instant (hash lookup)
 
 ## Disclaimer
 

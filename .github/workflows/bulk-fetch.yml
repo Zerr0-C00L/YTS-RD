@@ -1,0 +1,66 @@
+name: Bulk Fetch All YTS Movies
+
+on:
+  # Manual trigger only - this is a one-time operation
+  workflow_dispatch:
+    inputs:
+      start_page:
+        description: 'Starting page number (for resuming)'
+        required: false
+        default: '1'
+      max_pages:
+        description: 'Max pages to process (0 = all pages)'
+        required: false
+        default: '0'
+      min_rating:
+        description: 'Minimum IMDB rating'
+        required: false
+        default: '0'
+
+jobs:
+  bulk-fetch:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6 hours max
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+          cache: 'pip'
+      
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+      
+      - name: Run bulk fetch
+        env:
+          REAL_DEBRID_API_TOKEN: ${{ secrets.REAL_DEBRID_API_TOKEN }}
+          START_PAGE: ${{ github.event.inputs.start_page || '1' }}
+          MAX_PAGES: ${{ github.event.inputs.max_pages || '0' }}
+          MIN_RATING: ${{ github.event.inputs.min_rating || '0' }}
+        run: |
+          python bulk_fetch.py
+      
+      - name: Upload progress files
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: bulk-fetch-progress-${{ github.run_number }}
+          path: |
+            bulk_fetch_progress.txt
+            bulk_fetch_complete.flag
+          retention-days: 30
+      
+      - name: Commit completion flag
+        if: success()
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add bulk_fetch_complete.flag || true
+          git commit -m "Mark bulk fetch as complete" || true
+          git push || true
