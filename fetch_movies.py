@@ -239,6 +239,10 @@ def main():
             skipped_count += 1
             continue
         
+        # Show available qualities
+        available_qualities = [t.get("quality") for t in torrents]
+        print(f"  Available qualities: {', '.join(available_qualities)}")
+        
         # Process all quality versions if enabled
         if fetch_all_qualities:
             # Get torrents for all preferred qualities

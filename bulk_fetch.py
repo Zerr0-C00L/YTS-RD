@@ -260,6 +260,9 @@ def main():
                 total_skipped += 1
                 continue
             
+            # Show available qualities
+            available_qualities = [t.get("quality") for t in torrents]
+            
             # Get torrents for all preferred qualities
             torrents_to_add = []
             for quality in preferred_qualities:
@@ -269,11 +272,15 @@ def main():
                         break
             
             if not torrents_to_add:
+                # Log if movie has no matching qualities
+                if movies_processed % 10 == 0:  # Every 10th movie to avoid spam
+                    print(f"  {title} ({year}): Available [{', '.join(available_qualities)}] - None match")
                 total_skipped += 1
                 continue
             
             # Add each quality version
             movie_added = False
+            qualities_added = []
             for torrent in torrents_to_add:
                 torrent_hash = torrent.get("hash", "").lower()
                 
@@ -290,6 +297,7 @@ def main():
                     if rd.select_files(torrent_id):
                         total_added += 1
                         movie_added = True
+                        qualities_added.append(torrent.get('quality'))
                         existing_hashes.add(torrent_hash)
                     else:
                         total_failed += 1
@@ -297,6 +305,10 @@ def main():
                     total_failed += 1
                 
                 time.sleep(2)  # Rate limiting between requests
+            
+            # Log what was added
+            if movie_added and qualities_added:
+                print(f"  ✓ {title} ({year}): Added [{', '.join(qualities_added)}]")
             
             if not movie_added:
                 total_skipped += 1
