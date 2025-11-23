@@ -179,7 +179,7 @@ def main():
     min_rating = float(os.getenv("MIN_RATING", "0"))
     start_page = int(os.getenv("START_PAGE", "1"))
     max_pages = int(os.getenv("MAX_PAGES", "0"))  # 0 = all pages
-    preferred_qualities = ["2160p", "1080p", "720p"]
+    preferred_qualities = ["2160p", "1080p"]
     
     if not rd_api_token:
         print("ERROR: REAL_DEBRID_API_TOKEN environment variable not set")
@@ -193,7 +193,7 @@ def main():
     print(f"  - Minimum Rating: {min_rating}")
     print(f"  - Starting Page: {start_page}")
     print(f"  - Max Pages: {'All' if max_pages == 0 else max_pages}")
-    print(f"  - Qualities: {', '.join(preferred_qualities)}")
+    print(f"  - Qualities: {', '.join(preferred_qualities)} (2160p, 1080p only)")
     print("="*70)
     
     # Initialize clients

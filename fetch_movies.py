@@ -188,7 +188,7 @@ def main():
     max_movies = int(os.getenv("MAX_MOVIES", "10"))
     min_rating = float(os.getenv("MIN_RATING", "0"))
     fetch_all_qualities = os.getenv("FETCH_ALL_QUALITIES", "true").lower() == "true"
-    preferred_qualities = ["2160p", "1080p", "720p"]  # Order of preference
+    preferred_qualities = ["2160p", "1080p"]  # Order of preference
     
     if not rd_api_token:
         print("ERROR: REAL_DEBRID_API_TOKEN environment variable not set")
