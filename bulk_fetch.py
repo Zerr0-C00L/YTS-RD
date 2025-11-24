@@ -179,6 +179,7 @@ def main():
     min_rating = float(os.getenv("MIN_RATING", "0"))
     start_page = int(os.getenv("START_PAGE", "1"))
     max_pages = int(os.getenv("MAX_PAGES", "0"))  # 0 = all pages
+    batch_size = int(os.getenv("BATCH_SIZE", "500"))  # Process in batches to avoid crashes
     preferred_qualities = ["2160p", "1080p"]
     
     if not rd_api_token:
@@ -193,6 +194,7 @@ def main():
     print(f"  - Minimum Rating: {min_rating}")
     print(f"  - Starting Page: {start_page}")
     print(f"  - Max Pages: {'All' if max_pages == 0 else max_pages}")
+    print(f"  - Batch Size: {batch_size} pages (to prevent crashes)")
     print(f"  - Qualities: {', '.join(preferred_qualities)} (2160p, 1080p only)")
     print("="*70)
     
@@ -227,27 +229,42 @@ def main():
     
     print(f"Total pages to process: {total_pages:,}")
     
-    # Determine actual page range
+    # Determine actual page range with batch limit
     if max_pages > 0:
         end_page = min(start_page + max_pages - 1, total_pages)
     else:
-        end_page = total_pages
+        # Apply batch size limit to prevent crashes
+        end_page = min(start_page + batch_size - 1, total_pages)
     
     print(f"Will process pages {start_page} to {end_page}")
+    if end_page < total_pages:
+        print(f"NOTE: Processing in batches. After completion, resume from page {end_page + 1}")
     print("="*70)
     
     # Process pages
     for page in range(start_page, end_page + 1):
-        if page > 1:  # Already fetched page 1
-            print(f"\n[Page {page}/{end_page}] Fetching movies...")
-            movies, _ = yts.get_movies_page(page=page, minimum_rating=min_rating)
-            time.sleep(2)  # Rate limiting between pages
-        
-        if not movies:
-            print(f"[Page {page}/{end_page}] No movies found, skipping")
+        try:
+            if page > 1:  # Already fetched page 1
+                print(f"\n[Page {page}/{end_page}] Fetching movies...")
+                movies, _ = yts.get_movies_page(page=page, minimum_rating=min_rating)
+                time.sleep(2)  # Rate limiting between pages
+            
+            if not movies:
+                print(f"[Page {page}/{end_page}] No movies found, skipping")
+                continue
+            
+            print(f"[Page {page}/{end_page}] Processing {len(movies)} movies...")
+        except Exception as e:
+            print(f"\n[Page {page}/{end_page}] ERROR: Failed to fetch page: {e}")
+            print("Saving progress and continuing...")
+            with open("bulk_fetch_progress.txt", "w") as f:
+                f.write(f"Last completed page: {page - 1}\n")
+                f.write(f"Last attempted page: {page}\n")
+                f.write(f"Total added: {total_added}\n")
+                f.write(f"Total skipped: {total_skipped}\n")
+                f.write(f"Total failed: {total_failed}\n")
+                f.write(f"Error: {str(e)}\n")
             continue
-        
-        print(f"[Page {page}/{end_page}] Processing {len(movies)} movies...")
         
         for movie in movies:
             title = movie.get("title", "Unknown")
@@ -318,26 +335,52 @@ def main():
         
         # Save progress every 10 pages
         if page % 10 == 0:
-            with open("bulk_fetch_progress.txt", "w") as f:
-                f.write(f"Last completed page: {page}\n")
-                f.write(f"Total added: {total_added}\n")
-                f.write(f"Total skipped: {total_skipped}\n")
-                f.write(f"Total failed: {total_failed}\n")
+            try:
+                with open("bulk_fetch_progress.txt", "w") as f:
+                    f.write(f"Last completed page: {page}\n")
+                    f.write(f"Total added: {total_added}\n")
+                    f.write(f"Total skipped: {total_skipped}\n")
+                    f.write(f"Total failed: {total_failed}\n")
+                    f.write(f"Timestamp: {datetime.now().isoformat()}\n")
+            except Exception as e:
+                print(f"Warning: Failed to save progress: {e}")
     
     # Final summary
     print("\n" + "="*70)
-    print("BULK FETCH COMPLETE")
+    batch_complete = end_page >= total_pages
+    if batch_complete:
+        print("BULK FETCH COMPLETE - ALL PAGES PROCESSED")
+    else:
+        print(f"BATCH COMPLETE - PAGES {start_page} to {end_page}")
     print("="*70)
     print(f"Finished at: {datetime.now().isoformat()}")
+    print(f"Pages processed: {start_page} to {end_page}")
     print(f"Movies processed: {movies_processed:,}")
     print(f"Torrents added to Real-Debrid: {total_added:,}")
     print(f"Torrents skipped (duplicates/no torrents): {total_skipped:,}")
     print(f"Torrents failed: {total_failed:,}")
+    
+    if not batch_complete:
+        print(f"\nTO CONTINUE: Set START_PAGE={end_page + 1} and run again")
+        print(f"Remaining pages: {total_pages - end_page}")
+    
     print("="*70)
     
-    # Mark bulk fetch as complete
-    with open("bulk_fetch_complete.flag", "w") as f:
-        f.write(datetime.now().isoformat())
+    # Mark bulk fetch as complete only if all pages processed
+    if batch_complete:
+        with open("bulk_fetch_complete.flag", "w") as f:
+            f.write(datetime.now().isoformat())
+        print("\n✓ Bulk fetch complete flag created - incremental mode will activate")
+    
+    # Always save final progress
+    with open("bulk_fetch_progress.txt", "w") as f:
+        f.write(f"Last completed page: {end_page}\n")
+        f.write(f"Total pages: {total_pages}\n")
+        f.write(f"Batch complete: {batch_complete}\n")
+        f.write(f"Total added: {total_added}\n")
+        f.write(f"Total skipped: {total_skipped}\n")
+        f.write(f"Total failed: {total_failed}\n")
+        f.write(f"Timestamp: {datetime.now().isoformat()}\n")
 
 
 if __name__ == "__main__":

@@ -9,9 +9,13 @@ on:
         required: false
         default: '1'
       max_pages:
-        description: 'Max pages to process (0 = all pages)'
+        description: 'Max pages to process (0 = batch size default)'
         required: false
         default: '0'
+      batch_size:
+        description: 'Pages per batch (default 500 to prevent crashes)'
+        required: false
+        default: '500'
       min_rating:
         description: 'Minimum IMDB rating'
         required: false
@@ -42,6 +46,7 @@ jobs:
           REAL_DEBRID_API_TOKEN: ${{ secrets.REAL_DEBRID_API_TOKEN }}
           START_PAGE: ${{ github.event.inputs.start_page || '1' }}
           MAX_PAGES: ${{ github.event.inputs.max_pages || '0' }}
+          BATCH_SIZE: ${{ github.event.inputs.batch_size || '500' }}
           MIN_RATING: ${{ github.event.inputs.min_rating || '0' }}
         run: |
           python bulk_fetch.py

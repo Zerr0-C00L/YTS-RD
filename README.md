@@ -41,20 +41,28 @@ To import all ~71,000 movies from YTS:
 
 1. Go to **Actions** → **Bulk Fetch All YTS Movies**
 2. Click **Run workflow**
-3. Leave defaults (Start Page: 1, Max Pages: 0 for all)
+3. Leave defaults (Start Page: 1, Batch Size: 500)
 4. Click **Run workflow**
+5. **Repeat**: After each batch completes, run again with START_PAGE incremented by 500
 
 **Important Notes:**
-- This will take several hours to complete (~6-10 hours)
-- Processes all qualities (2160p, 1080p, 720p) for each movie
-- Can be paused and resumed by setting the start page
-- Creates a flag file when complete to switch to incremental mode
-- Respects rate limits with automatic delays
+- Processes in **batches of 500 pages** to prevent crashes (this is automatic)
+- Each batch takes ~3-5 hours to complete
+- After ~3 batches (~1500 pages), all movies will be imported
+- Processes 2160p and 1080p qualities only
+- Automatically creates completion flag when all pages are done
 
-**To Resume if Interrupted:**
-1. Check the artifacts from the last run for `bulk_fetch_progress.txt`
-2. Note the last completed page
-3. Run workflow again with Start Page = (last page + 1)
+**To Resume After Each Batch:**
+1. Check the workflow output or `bulk_fetch_progress.txt` artifact
+2. Note the "TO CONTINUE: Set START_PAGE=XXX" message
+3. Run workflow again with that start page number
+4. Repeat until "BULK FETCH COMPLETE - ALL PAGES PROCESSED"
+
+**Example Resume Pattern:**
+- Run 1: START_PAGE=1 (processes pages 1-500)
+- Run 2: START_PAGE=501 (processes pages 501-1000)  
+- Run 3: START_PAGE=1001 (processes pages 1001-1500)
+- Continue until complete
 
 ### Option 2: Incremental Mode (Automatic After Bulk)
 
