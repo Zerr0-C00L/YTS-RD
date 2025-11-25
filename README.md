@@ -35,6 +35,22 @@ Automatically fetch movies from YTS and add them to your Real-Debrid account usi
 
 ## Usage
 
+### TV Shows: Auto-Import from ShowRSS
+
+Automatically fetch new TV show episodes every 2 hours:
+
+**What it does:**
+- Fetches the latest ~100 episodes from your ShowRSS feed
+- Filtered for FHD (1080p) quality with clean naming
+- Runs automatically every 2 hours
+- Skips episodes already in Real-Debrid
+
+**Note:** ShowRSS only provides recent episodes (not complete series from S01E01). It's designed to keep you current with ongoing shows.
+
+**The feed is already configured** - just enable GitHub Actions and it will start automatically!
+
+You can also manually trigger from: **Actions** → **Fetch ShowRSS TV Shows**
+
 ### Option 1: Bulk Fetch All Movies (Recommended First Step)
 
 To import all ~71,000 movies from YTS:
