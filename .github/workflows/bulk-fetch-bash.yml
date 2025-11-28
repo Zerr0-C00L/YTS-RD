@@ -1,0 +1,65 @@
+name: Bulk Fetch YTS (Bash Script)
+
+on:
+  # Manual trigger only
+  workflow_dispatch:
+    inputs:
+      language:
+        description: 'Movie language filter'
+        required: false
+        default: 'en'
+      use_cache:
+        description: 'Use cached RD hashes (faster)'
+        required: false
+        default: 'true'
+
+jobs:
+  bulk-fetch-bash:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360  # 6 hours max
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc jq curl
+      
+      - name: Restore RD hash cache
+        if: ${{ github.event.inputs.use_cache == 'true' }}
+        uses: actions/cache@v3
+        with:
+          path: rd_hashes_cache.txt
+          key: rd-hashes-${{ github.run_id }}
+          restore-keys: |
+            rd-hashes-
+      
+      - name: Make script executable
+        run: chmod +x bulk_fetch_bash.sh
+      
+      - name: Run bulk fetch
+        env:
+          REAL_DEBRID_API_TOKEN: ${{ secrets.REAL_DEBRID_API_TOKEN }}
+          LANGUAGE: ${{ github.event.inputs.language || 'en' }}
+          RD_CACHE_FILE: ${{ github.event.inputs.use_cache == 'true' && 'rd_hashes_cache.txt' || '' }}
+        run: |
+          ./bulk_fetch_bash.sh
+      
+      - name: Upload failed hashes
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failed-hashes-${{ github.run_number }}
+          path: |
+            failed_hashes.txt
+          retention-days: 30
+          if-no-files-found: ignore
+      
+      - name: Save RD hash cache
+        if: always()
+        uses: actions/cache/save@v3
+        with:
+          path: rd_hashes_cache.txt
+          key: rd-hashes-${{ github.run_id }}

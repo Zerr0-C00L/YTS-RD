@@ -35,50 +35,33 @@ Automatically fetch movies from YTS and add them to your Real-Debrid account usi
 
 ## Usage
 
-### TV Shows: Auto-Import from ShowRSS
+### Option 1A: Bulk Fetch (Bash Script - Recommended)
 
-Automatically fetch new TV show episodes every 2 hours:
+**Fastest method** - Uses parallel processing to import all movies at once:
 
-**What it does:**
-- Fetches the latest ~100 episodes from your ShowRSS feed
-- Filtered for FHD (1080p) quality with clean naming
-- Runs automatically every 2 hours
-- Skips episodes already in Real-Debrid
+1. Go to **Actions** → **Bulk Fetch YTS (Bash Script)**
+2. Click **Run workflow**
+3. Leave defaults (Language: en, Use cache: true)
+4. Click **Run workflow**
 
-**Note:** ShowRSS only provides recent episodes (not complete series from S01E01). It's designed to keep you current with ongoing shows.
+**Features:**
+- **Single run** imports all ~71,000 movies (no manual batching needed)
+- Parallel page fetching for maximum speed
+- Fetches 2160p + 1080p (prefers 2160p if available)
+- Caches Real-Debrid hashes for faster subsequent runs
+- Takes ~4-6 hours total
+- Language filtering support
 
-**The feed is already configured** - just enable GitHub Actions and it will start automatically!
+### Option 1B: Bulk Fetch (Python - Alternative)
 
-You can also manually trigger from: **Actions** → **Fetch ShowRSS TV Shows**
-
-### Option 1: Bulk Fetch All Movies (Recommended First Step)
-
-To import all ~71,000 movies from YTS:
+If you prefer the Python version with manual batching:
 
 1. Go to **Actions** → **Bulk Fetch All YTS Movies**
 2. Click **Run workflow**
 3. Leave defaults (Start Page: 1, Batch Size: 500)
-4. Click **Run workflow**
-5. **Repeat**: After each batch completes, run again with START_PAGE incremented by 500
+4. **Repeat**: After each batch completes, run again with START_PAGE incremented by 500
 
-**Important Notes:**
-- Processes in **batches of 500 pages** to prevent crashes (this is automatic)
-- Each batch takes ~3-5 hours to complete
-- After ~3 batches (~1500 pages), all movies will be imported
-- Processes 2160p and 1080p qualities only
-- Automatically creates completion flag when all pages are done
-
-**To Resume After Each Batch:**
-1. Check the workflow output or `bulk_fetch_progress.txt` artifact
-2. Note the "TO CONTINUE: Set START_PAGE=XXX" message
-3. Run workflow again with that start page number
-4. Repeat until "BULK FETCH COMPLETE - ALL PAGES PROCESSED"
-
-**Example Resume Pattern:**
-- Run 1: START_PAGE=1 (processes pages 1-500)
-- Run 2: START_PAGE=501 (processes pages 501-1000)  
-- Run 3: START_PAGE=1001 (processes pages 1001-1500)
-- Continue until complete
+**Requires ~3 runs** to complete all pages (500 pages per run)
 
 ### Option 2: Incremental Mode (Automatic After Bulk)
 
