@@ -161,11 +161,31 @@ if [ "$totalcount" -eq 0 ]; then
 fi
 
 echo "Found $totalcount unadded torrents. Starting upload to Real-Debrid..."
-count=0
 
-for hash in "${uniqueHashes[@]}"; do
-    response=$(curl -s -X POST -H "$RD_HEADERS" -H "application/x-www-form-urlencoded" \
-        --data-raw "magnet=magnet:?xt=urn:btih:${hash}" "${RD_API_URL}/addMagnet")
+# Load progress if exists
+if [ -f "upload_progress.txt" ]; then
+    count=$(cat upload_progress.txt)
+    echo "Resuming from torrent #$count..."
+else
+    count=0
+fi
+
+for i in "${!uniqueHashes[@]}"; do
+    # Skip already processed hashes
+    if [ "$i" -lt "$count" ]; then
+        continue
+    fi
+    
+    hash="${uniqueHashes[$i]}"
+    
+    # Trap errors to save progress
+    if ! response=$(curl -s -X POST -H "$RD_HEADERS" -H "application/x-www-form-urlencoded" \
+        --data-raw "magnet=magnet:?xt=urn:btih:${hash}" "${RD_API_URL}/addMagnet" 2>&1); then
+        echo "Network error at torrent $count. Saving progress..." >&2
+        echo "$count" > upload_progress.txt
+        echo "$hash" >> failed_hashes.txt
+        continue
+    fi
 
     # Handle download limit
     if [[ $(jq -r '.error_code' <<< "$response") == "21" ]]; then 
@@ -189,23 +209,37 @@ for hash in "${uniqueHashes[@]}"; do
         echo "$hash" >> failed_hashes.txt
     else
         response=$(curl -s -X POST -H "$RD_HEADERS" -H "application/x-www-form-urlencoded" \
-            --data-raw "files=all" "${RD_API_URL}/selectFiles/${torrentId}")
+            --data-raw "files=all" "${RD_API_URL}/selectFiles/${torrentId}" 2>/dev/null)
 
         if [[ $(jq -r '.error_code' <<< "$response") == "21" ]]; then 
             clearRDActive
             curl -s -X POST -H "$RD_HEADERS" -H "application/x-www-form-urlencoded" \
-                --data-raw "files=all" "${RD_API_URL}/selectFiles/${torrentId}"
+                --data-raw "files=all" "${RD_API_URL}/selectFiles/${torrentId}" 2>/dev/null
         fi
         
         ((count++))
         show_progress "$count" "$totalcount"
+        
+        # Save progress every 100 torrents
+        if (( count % 100 == 0 )); then
+            echo "$count" > upload_progress.txt
+        fi
     fi
     sleep 1
 done
 
+# Clean up progress file on success
+rm -f upload_progress.txt
+
 echo ""
 echo "=================================="
-echo "Script finished!"
-echo "Successfully added: $count / $totalcount torrents"
+if [ "$count" -eq "$totalcount" ]; then
+    echo "Script finished!"
+    echo "Successfully added: $count / $totalcount torrents"
+else
+    echo "Partial completion"
+    echo "Successfully added: $count / $totalcount torrents"
+    echo "To resume, run the workflow again with use_cache=true"
+fi
 echo "Completed: $(date)"
 echo "=================================="

@@ -27,11 +27,13 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y bc jq curl
       
-      - name: Restore RD hash cache
+      - name: Restore RD hash cache and progress
         if: ${{ github.event.inputs.use_cache == 'true' }}
         uses: actions/cache@v3
         with:
-          path: rd_hashes_cache.txt
+          path: |
+            rd_hashes_cache.txt
+            upload_progress.txt
           key: rd-hashes-${{ github.run_id }}
           restore-keys: |
             rd-hashes-
@@ -47,19 +49,22 @@ jobs:
         run: |
           ./bulk_fetch_bash.sh
       
-      - name: Upload failed hashes
+      - name: Upload progress and failed hashes
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: failed-hashes-${{ github.run_number }}
+          name: bulk-progress-${{ github.run_number }}
           path: |
             failed_hashes.txt
+            upload_progress.txt
           retention-days: 30
           if-no-files-found: ignore
       
-      - name: Save RD hash cache
+      - name: Save RD hash cache and progress
         if: always()
         uses: actions/cache/save@v3
         with:
-          path: rd_hashes_cache.txt
+          path: |
+            rd_hashes_cache.txt
+            upload_progress.txt
           key: rd-hashes-${{ github.run_id }}
