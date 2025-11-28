@@ -133,22 +133,32 @@ fi
 echo "Found ${#rdhashes[@]} existing hashes on Real-Debrid."
 
 # --- 2. FETCH YTS HASHES ---
-moviescount=$(curl -s -X GET "$YTS_URL" | jq '.data.movie_count')
-pages=$(( (moviescount + 49) / 50 ))
-echo "Found $moviescount movies across $pages pages. Starting scrape..."
+# Check if we have cached YTS hashes to skip re-fetching
+if [ -f "yts_hashes_cache.txt" ] && [ -f "upload_progress.txt" ]; then
+    echo "Found cached YTS hashes, skipping fetch phase..."
+    mapfile -t ytsHashes < yts_hashes_cache.txt
+    echo "Loaded ${#ytsHashes[@]} cached YTS hashes for language '$language'."
+else
+    moviescount=$(curl -s -X GET "$YTS_URL" | jq '.data.movie_count')
+    pages=$(( (moviescount + 49) / 50 ))
+    echo "Found $moviescount movies across $pages pages. Starting scrape..."
 
-YTS_RESULTS_FILE=$(mktemp)
+    YTS_RESULTS_FILE=$(mktemp)
 
-for (( page=1; page<=pages; page++ )); do
-    yts_get_page_hashes "$page" "$pages" &
-done > "$YTS_RESULTS_FILE"
-wait
+    for (( page=1; page<=pages; page++ )); do
+        yts_get_page_hashes "$page" "$pages" &
+    done > "$YTS_RESULTS_FILE"
+    wait
 
-echo "All YTS fetch jobs completed. Processing results..."
-mapfile -t ytsHashes < "$YTS_RESULTS_FILE"
-rm "$YTS_RESULTS_FILE"
-mapfile -t ytsHashes < <(printf '%s\n' "${ytsHashes[@]}" | sort -u)
-echo "Found ${#ytsHashes[@]} unique YTS hashes for language '$language'."
+    echo "All YTS fetch jobs completed. Processing results..."
+    mapfile -t ytsHashes < "$YTS_RESULTS_FILE"
+    rm "$YTS_RESULTS_FILE"
+    mapfile -t ytsHashes < <(printf '%s\n' "${ytsHashes[@]}" | sort -u)
+    echo "Found ${#ytsHashes[@]} unique YTS hashes for language '$language'."
+    
+    # Cache YTS hashes for resume
+    printf '%s\n' "${ytsHashes[@]}" > yts_hashes_cache.txt
+fi
 
 # --- 3. FIND AND ADD MISSING HASHES ---
 echo "Comparing lists to find unadded torrents..."
@@ -228,8 +238,10 @@ for i in "${!uniqueHashes[@]}"; do
     sleep 1
 done
 
-# Clean up progress file on success
-rm -f upload_progress.txt
+# Clean up progress files on complete success
+if [ "$count" -eq "$totalcount" ]; then
+    rm -f upload_progress.txt yts_hashes_cache.txt
+fi
 
 echo ""
 echo "=================================="

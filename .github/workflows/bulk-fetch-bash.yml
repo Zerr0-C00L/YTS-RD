@@ -27,16 +27,17 @@ jobs:
           sudo apt-get update
           sudo apt-get install -y bc jq curl
       
-      - name: Restore RD hash cache and progress
+      - name: Restore cache (RD hashes, YTS hashes, progress)
         if: ${{ github.event.inputs.use_cache == 'true' }}
         uses: actions/cache@v3
         with:
           path: |
             rd_hashes_cache.txt
+            yts_hashes_cache.txt
             upload_progress.txt
-          key: rd-hashes-${{ github.run_id }}
+          key: bulk-fetch-cache-${{ github.run_id }}
           restore-keys: |
-            rd-hashes-
+            bulk-fetch-cache-
       
       - name: Make script executable
         run: chmod +x bulk_fetch_bash.sh
@@ -60,11 +61,12 @@ jobs:
           retention-days: 30
           if-no-files-found: ignore
       
-      - name: Save RD hash cache and progress
+      - name: Save cache (RD hashes, YTS hashes, progress)
         if: always()
         uses: actions/cache/save@v3
         with:
           path: |
             rd_hashes_cache.txt
+            yts_hashes_cache.txt
             upload_progress.txt
-          key: rd-hashes-${{ github.run_id }}
+          key: bulk-fetch-cache-${{ github.run_id }}
