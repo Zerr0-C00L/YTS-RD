@@ -34,6 +34,7 @@ jobs:
           path: |
             rd_hashes_cache.txt
             yts_hashes_cache.txt
+            unique_hashes.txt
             upload_progress.txt
           key: bulk-fetch-cache-${{ github.run_id }}
           restore-keys: |
@@ -68,5 +69,6 @@ jobs:
           path: |
             rd_hashes_cache.txt
             yts_hashes_cache.txt
+            unique_hashes.txt
             upload_progress.txt
           key: bulk-fetch-cache-${{ github.run_id }}

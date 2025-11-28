@@ -1,0 +1,66 @@
+name: Resume Upload Only
+
+on:
+  workflow_dispatch:
+    inputs:
+      batch_size:
+        description: 'Torrents per batch (default 10000)'
+        required: false
+        default: '10000'
+
+jobs:
+  resume-upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 360
+    
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+      
+      - name: Install dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y bc jq curl
+      
+      - name: Restore cache
+        uses: actions/cache@v3
+        with:
+          path: |
+            unique_hashes.txt
+            upload_progress.txt
+            failed_hashes.txt
+          key: resume-upload-${{ github.run_id }}
+          restore-keys: |
+            resume-upload-
+            bulk-fetch-cache-
+      
+      - name: Make script executable
+        run: chmod +x resume_upload.sh
+      
+      - name: Resume upload
+        env:
+          REAL_DEBRID_API_TOKEN: ${{ secrets.REAL_DEBRID_API_TOKEN }}
+          BATCH_SIZE: ${{ github.event.inputs.batch_size || '10000' }}
+        run: |
+          ./resume_upload.sh
+      
+      - name: Upload artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resume-progress-${{ github.run_number }}
+          path: |
+            failed_hashes.txt
+            upload_progress.txt
+          retention-days: 30
+          if-no-files-found: ignore
+      
+      - name: Save cache
+        if: always()
+        uses: actions/cache/save@v3
+        with:
+          path: |
+            unique_hashes.txt
+            upload_progress.txt
+            failed_hashes.txt
+          key: resume-upload-${{ github.run_id }}

@@ -161,8 +161,17 @@ else
 fi
 
 # --- 3. FIND AND ADD MISSING HASHES ---
-echo "Comparing lists to find unadded torrents..."
-mapfile -t uniqueHashes < <(grep -i -v -F -x -f <(printf "%s\n" "${rdhashes[@]}") <(printf "%s\n" "${ytsHashes[@]}"))
+# Check if we have cached unique hashes
+if [ -f "unique_hashes.txt" ] && [ -f "upload_progress.txt" ]; then
+    echo "Loading cached unique hashes list..."
+    mapfile -t uniqueHashes < unique_hashes.txt
+else
+    echo "Comparing lists to find unadded torrents..."
+    mapfile -t uniqueHashes < <(grep -i -v -F -x -f <(printf "%s\n" "${rdhashes[@]}") <(printf "%s\n" "${ytsHashes[@]}"))
+    
+    # Cache the unique hashes
+    printf '%s\n' "${uniqueHashes[@]}" > unique_hashes.txt
+fi
 
 totalcount=${#uniqueHashes[@]}
 if [ "$totalcount" -eq 0 ]; then
