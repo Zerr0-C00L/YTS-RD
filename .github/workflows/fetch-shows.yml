@@ -2,8 +2,8 @@ name: Fetch Latest ShowRSS TV Shows
 
 on:
   schedule:
-    # Run every 2 hours to check for new episodes
-    - cron: '0 */2 * * *'
+    # Run 1am to check for new episodes
+    - cron: '0 1 * * *'
   
   # Allow manual trigger
   workflow_dispatch:
