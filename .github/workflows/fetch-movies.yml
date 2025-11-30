@@ -2,8 +2,8 @@ name: Fetch Latest YTS Movies to Real-Debrid
 
 on:
   schedule:
-    # Run every hour at minute 0 (only fetches latest after bulk is complete)
-    - cron: '0 * * * *'
+    # Run 3am (only fetches latest after bulk is complete)
+    - cron: '0 3 * * *'
   
   # Allow manual trigger
   workflow_dispatch:
